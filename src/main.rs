@@ -1,9 +1,9 @@
 mod standard_brainfuck;
-
+mod ezfuck;
 
 fn main() {
-    let instructions = standard_brainfuck::parser::parser::parse(
-        "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
+    let instructions = ezfuck::parser::parser::compile_to_intermediate(
+        "+-><"
     );
 
     // println!("{:?}", instructions.iter().map(|inst| inst.to_string()).collect::<Vec<String>>().join(", "));
@@ -12,5 +12,5 @@ fn main() {
         println!("{i}: {inst:?}");
     }
 
-    standard_brainfuck::interpreter::interpreter::interpret_with_std_io(&instructions);
+    ezfuck::interpreter::interpreter::interpret_with_std_io(&instructions);
 }

@@ -1,4 +1,6 @@
+use std::io;
 use clap::Parser;
+use crate::ezfuck::repl::repl::start_repl;
 
 mod standard_brainfuck;
 mod ezfuck;
@@ -30,7 +32,12 @@ fn main() {
             }
         }
         None => {
-            println!("REPL functionality is not implemented yet. Please pass a path to run code.");
+            let stdin = io::stdin();
+            let mut input = stdin.lock();
+
+            let mut stdout = io::stdout();
+
+            start_repl(&mut input, &mut stdout);
         }
     }
 }

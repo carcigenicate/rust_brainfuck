@@ -1,9 +1,38 @@
 # Rust Brainfuck and Ezfuck Interpreters
 
-This is the start of my attempt to write interpreters for Brainfuck and the variant of Brainfuck I created called "Ezfuck"
-which adds some convenience operators.
+This is an Ezfuck interpreter, which can also be used to interpret Brainfuck assuming the Brainfuck does not contain comments
+that use characters that correspond to the new Ezfuck commands.
 
 # Running
+
+## REPL
+
+Similar to `python`, running the interpreter without arguments will cause it to start a REPL:
+
+```powershell
+PS path> .\ezfuck.exe
+     V  
+i | 000 |
+d | 000 |
+a |     |
+EZ> +8[>+4[>+2>+3>+3>+<4-]>+>+>->2+[<]<-]>2.>-3.+7..+3.>2.<-.<.+3.-6.-8.>2+.>+2.
+Output: Hello World!
+
+                                         V  
+i | 000 | 001 | 002 | 003 | 004 | 005 | 006 |
+d | 000 | 000 | 072 | 100 | 087 | 033 | 010 |
+a |     |     |  H  |  d  |  W  |  !  |     |
+EZ> !
+PS path> 
+
+```
+
+At the start of each loop, the current state of the cells is printed in four rows: the cell ptr location, the cell (i)ndex,
+the (d)ecimal representation, and the (a)scii representation.
+
+At the moment, `!` is used to end the REPL session. Ctrl+C can also be used, but it currently causes a non-graceful end.
+
+## From File
 
 `helloWorld.txt`
 
@@ -21,7 +50,7 @@ Hello World!
 Running the executable directly after compiling it:
 
 ```powershell
-PS path> .\brainfuck.exe --path helloWorld.txt
+PS path> .\ezfuck.exe --path helloWorld.txt
 Hello World!
 ```
 
@@ -48,5 +77,4 @@ I'm not sure if those were even a useful feature to begin with.
 
 # Future Plans
 
- - A REPL
  - The ability to compile Brainfuck/Ezfuck to machine code

@@ -52,15 +52,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "brainfuck"
-version = "0.1.0"
-dependencies = [
- "clap",
- "strum",
- "strum_macros",
-]
-
-[[package]]
 name = "clap"
 version = "4.5.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -105,6 +96,15 @@ name = "colorchoice"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
+
+[[package]]
+name = "ezfuck"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "strum",
+ "strum_macros",
+]
 
 [[package]]
 name = "heck"

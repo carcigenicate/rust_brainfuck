@@ -3,15 +3,29 @@
 This is the start of my attempt to write interpreters for Brainfuck and the variant of Brainfuck I created called "Ezfuck"
 which adds some convenience operators.
 
-It's still in its infancy though, so there is no command line options yet or the ability to run different code. To run code
-currently, you need to change what is in `main`, and then recompile the project.
-
 # Running
 
+`helloWorld.txt`
+
+```brainfuck
++8[>+4[>+2>+3>+3>+<4-]>+>+>->2+[<]<-]>2.>-3.+7..+3.>2.<-.<.+3.-6.-8.>2+.>+2.
+```
+
+With cargo:
+
 ```powershell
-PS path> cargo run
+PS path> cargo run -- --path helloWorld.txt
 Hello World!
 ```
+
+Running the executable directly after compiling it:
+
+```powershell
+PS path> .\brainfuck.exe --path helloWorld.txt
+Hello World!
+```
+
+This will interpret the code as Ezfuck. The option to specify Brainfuck is not available yet.
 
 Any comment-less Brainfuck should be valid Ezfuck. If you currently use `^`, `V`, `*`, or `/` in comments though, those
 will need to be removed first.
@@ -34,6 +48,5 @@ I'm not sure if those were even a useful feature to begin with.
 
 # Future Plans
 
- - Command line support so code can be changed after compilation
  - A REPL
  - The ability to compile Brainfuck/Ezfuck to machine code

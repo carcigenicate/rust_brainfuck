@@ -1,14 +1,36 @@
+use clap::Parser;
+
 mod standard_brainfuck;
 mod ezfuck;
 
-fn main() {
-    let instructions = ezfuck::parser::parser::compile_to_intermediate(
-        "+8[>+4[>+2>+3>+3>+<4-]>+>+>->2+[<]<-]>2.>-3.+7..+3.>2.<-.<.+3.-6.-8.>2+.>+2."
-    );
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    path: Option<String>,
+}
 
-    // for (i, inst) in instructions.iter().enumerate() {
-    //     println!("{i}: {inst:?}");
-    // }
-
+fn interpret_string(code: &str) -> () {
+    let instructions = ezfuck::parser::parser::compile_to_intermediate(code);
     ezfuck::interpreter::interpreter::interpret_with_std_io(&instructions);
+}
+
+fn main() {
+    let args = Args::parse();
+
+    match args.path {
+        Some(path) => {
+            match std::fs::read_to_string(path) {
+                Ok(code) => {
+                    interpret_string(code.as_str());
+                }
+                Err(err) => {
+                    eprintln!("Could not read file: {err}");
+                }
+            }
+        }
+        None => {
+            println!("REPL functionality is not implemented yet. Please pass a path to run code.");
+        }
+    }
 }

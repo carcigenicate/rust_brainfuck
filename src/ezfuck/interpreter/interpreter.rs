@@ -38,11 +38,9 @@ fn read_value<R: BufRead>(in_stream: &mut R) -> u8 {
     return input[0];
 }
 
-pub fn interpret<R: BufRead, W: Write>(instructions: &Vec<Instruction>, in_stream: &mut R, out_stream: &mut W) {
+pub fn interpret<R: BufRead, W: Write>(instructions: &Vec<Instruction>, cells: &mut Vec<u8>, initial_cell_ptr: usize, in_stream: &mut R, out_stream: &mut W) -> usize {
     let mut instruction_ptr = 0;
-    let mut cell_ptr = 0;
-
-    let mut cells: Vec<u8> = vec![0];
+    let mut cell_ptr = initial_cell_ptr;
 
     while instruction_ptr < instructions.len() {
         let current_instruction = instructions[instruction_ptr];
@@ -58,7 +56,7 @@ pub fn interpret<R: BufRead, W: Write>(instructions: &Vec<Instruction>, in_strea
                 let abs_offset = offset.determine_value(cells[cell_ptr]);
                 let signed_offset = if direction == Direction::Left { abs_offset as isize * -1 } else { abs_offset as isize };
                 let new_cell_ptr = add_cell_ptr_value(cell_ptr, signed_offset);
-                ensure_cell(&mut cells, new_cell_ptr);
+                ensure_cell(cells, new_cell_ptr);
                 cell_ptr = new_cell_ptr;
             }
 
@@ -95,6 +93,8 @@ pub fn interpret<R: BufRead, W: Write>(instructions: &Vec<Instruction>, in_strea
         instruction_ptr += 1;
         // println!("Cell Ptr: {cell_ptr}, Inst Ptr: {instruction_ptr} Cells: {cells:?}");
     }
+
+    return cell_ptr;
 }
 
 pub fn interpret_with_std_io(instructions: &Vec<Instruction>) {
@@ -103,7 +103,9 @@ pub fn interpret_with_std_io(instructions: &Vec<Instruction>) {
 
     let mut stdout = io::stdout();
 
-    interpret(instructions, &mut input, &mut stdout);
+    let mut cells = vec![0];
+
+    interpret(instructions, &mut cells, 0, &mut input, &mut stdout);
 }
 
 #[cfg(test)]
@@ -115,7 +117,9 @@ mod tests {
         let mut input = &input[..];
         let mut output = vec![];
 
-        interpret(&instructions, &mut input, &mut output);
+        let mut cells = vec![0];
+
+        interpret(&instructions, &mut cells, 0, &mut input, &mut output);
 
         let output_string = String::from_utf8(output).unwrap();
         return output_string;

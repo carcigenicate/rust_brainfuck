@@ -1,12 +1,47 @@
 use std::io;
 use std::io::{BufRead, Read, Write};
+use strum_macros::Display;
 use crate::ezfuck::parser::parser::{Instruction, EqualityOperator, MathOperator, InstructionValue, Direction};
 
-fn ensure_cell(cells: &mut Vec<u8>, slot_i: usize) -> () {
-    let needed = (slot_i as isize) - (cells.len() as isize) + 1;
-    if needed > 0 {
-        for _ in 0..needed {
-            cells.push(0);
+#[derive(Clone, Debug)]
+pub struct ExecutionState {
+    pub cells: Vec<u8>,
+    pub cell_ptr: usize,
+    pub instruction_ptr: usize,
+}
+
+impl ExecutionState {
+    pub fn new() -> ExecutionState {
+        return ExecutionState {
+            cell_ptr: 0,
+            instruction_ptr: 0,
+            cells: vec![0],
+        };
+    }
+
+    pub fn set_instruction_pointer(self: &mut Self, ptr: usize) {
+        self.instruction_ptr = ptr;
+    }
+
+    pub fn get_current_cell(self: &Self) -> u8 {
+        return self.cells[self.cell_ptr];
+    }
+
+    pub fn set_current_cell(self: &mut Self, new_value: u8) -> () {
+        self.cells[self.cell_ptr] = new_value;
+    }
+
+    pub fn set_cell_pointer(self: &mut Self, ptr: usize) {
+        self.ensure_cell(ptr);
+        self.cell_ptr = ptr;
+    }
+
+    fn ensure_cell(self: &mut Self, ptr: usize) -> () {
+        let needed = (ptr as isize) - (self.cells.len() as isize) + 1;
+        if needed > 0 {
+            for _ in 0..needed {
+                self.cells.push(0);
+            }
         }
     }
 }
@@ -38,63 +73,57 @@ fn read_value<R: BufRead>(in_stream: &mut R) -> u8 {
     return input[0];
 }
 
-pub fn interpret<R: BufRead, W: Write>(instructions: &Vec<Instruction>, cells: &mut Vec<u8>, initial_cell_ptr: usize, in_stream: &mut R, out_stream: &mut W) -> usize {
-    let mut instruction_ptr = 0;
-    let mut cell_ptr = initial_cell_ptr;
-
-    while instruction_ptr < instructions.len() {
-        let current_instruction = instructions[instruction_ptr];
+pub fn interpret<R: BufRead, W: Write>(instructions: &Vec<Instruction>, state: &mut ExecutionState, in_stream: &mut R, out_stream: &mut W) -> () {
+    while state.instruction_ptr < instructions.len() {
+        let current_instruction = instructions[state.instruction_ptr];
 
         match current_instruction {
             Instruction::ApplyOperatorToCell { operator, value } => {
-                let actual_value = value.determine_value(cells[cell_ptr]);
-                let new_cell_value = apply_math_operator(cells[cell_ptr], operator, actual_value);
-                cells[cell_ptr] = new_cell_value;
+                let actual_value = value.determine_value(state.get_current_cell());
+                let new_cell_value = apply_math_operator(state.get_current_cell(), operator, actual_value);
+                state.set_current_cell(new_cell_value);
             }
 
             Instruction::AddToCellPtr { direction, offset } => {
-                let abs_offset = offset.determine_value(cells[cell_ptr]);
+                let abs_offset = offset.determine_value(state.get_current_cell());
                 let signed_offset = if direction == Direction::Left { abs_offset as isize * -1 } else { abs_offset as isize };
-                let new_cell_ptr = add_cell_ptr_value(cell_ptr, signed_offset);
-                ensure_cell(cells, new_cell_ptr);
-                cell_ptr = new_cell_ptr;
+                let new_cell_ptr = add_cell_ptr_value(state.cell_ptr, signed_offset);
+                state.set_cell_pointer(new_cell_ptr);
             }
 
             Instruction::JumpToIf { position, operator, match_value } => {
                 match operator {
                     EqualityOperator::Equal => {
-                        if cells[cell_ptr] == match_value {
-                            instruction_ptr = position
+                        if state.get_current_cell() == match_value {
+                            state.set_instruction_pointer(position);
                         }
                     },
                     EqualityOperator::NotEqual => {
-                        if cells[cell_ptr] != match_value {
-                            instruction_ptr = position
+                        if state.get_current_cell() != match_value {
+                            state.set_instruction_pointer(position);
                         }
                     }
                 }
             }
 
             Instruction::PrintOut => {
-                print_value(out_stream, cells[cell_ptr]);
+                print_value(out_stream, state.get_current_cell());
             }
 
             Instruction::ReadIn => {
                 let input = read_value(in_stream);
-                cells[cell_ptr] = input;
+                state.set_current_cell(input);
             }
 
             Instruction::SetCell { value } => {
-                let actual_value = value.determine_value(cells[cell_ptr]);
-                cells[cell_ptr] = actual_value;
+                let actual_value = value.determine_value(state.get_current_cell());
+                state.set_current_cell(actual_value);
             }
         }
 
-        instruction_ptr += 1;
+        state.instruction_ptr += 1;
         // println!("Cell Ptr: {cell_ptr}, Inst Ptr: {instruction_ptr} Cells: {cells:?}");
     }
-
-    return cell_ptr;
 }
 
 pub fn interpret_with_std_io(instructions: &Vec<Instruction>) {
@@ -103,9 +132,9 @@ pub fn interpret_with_std_io(instructions: &Vec<Instruction>) {
 
     let mut stdout = io::stdout();
 
-    let mut cells = vec![0];
+    let mut state = ExecutionState::new();
 
-    interpret(instructions, &mut cells, 0, &mut input, &mut stdout);
+    interpret(instructions, &mut state, &mut input, &mut stdout);
 }
 
 #[cfg(test)]
@@ -117,9 +146,9 @@ mod tests {
         let mut input = &input[..];
         let mut output = vec![];
 
-        let mut cells = vec![0];
+        let mut state = ExecutionState::new();
 
-        interpret(&instructions, &mut cells, 0, &mut input, &mut output);
+        interpret(&instructions, &mut state, &mut input, &mut output);
 
         let output_string = String::from_utf8(output).unwrap();
         return output_string;

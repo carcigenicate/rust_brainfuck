@@ -1,6 +1,6 @@
 use std::cmp::max;
 use std::io::{BufRead, Read, Write};
-use crate::ezfuck::interpreter::interpreter::{interpret};
+use crate::ezfuck::interpreter::interpreter::{interpret, ExecutionState};
 use crate::ezfuck::parser::parser::{compile_to_intermediate};
 
 fn produce_cells_repr(cells: &Vec<u8>, cell_ptr: usize) -> String {
@@ -31,11 +31,10 @@ fn produce_cells_repr(cells: &Vec<u8>, cell_ptr: usize) -> String {
 }
 
 pub fn start_repl<R: BufRead, W: Write>(in_stream: &mut R, out_stream: &mut W) {
-    let mut cells = vec![0];
-    let mut cell_ptr = 0;
+    let mut state = ExecutionState::new();
 
     loop {
-        let cells_repr = produce_cells_repr(&cells, cell_ptr);
+        let cells_repr = produce_cells_repr(&state.cells, state.cell_ptr);
         out_stream.write(cells_repr.as_bytes()).unwrap();
         out_stream.flush().unwrap();
 
@@ -51,7 +50,8 @@ pub fn start_repl<R: BufRead, W: Write>(in_stream: &mut R, out_stream: &mut W) {
             let instructions = compile_to_intermediate(&input_buffer);
 
             out_stream.write(b"Output: ").unwrap();
-            cell_ptr = interpret(&instructions, &mut cells, cell_ptr, in_stream, out_stream);
+            interpret(&instructions, &mut state, in_stream, out_stream);
+            state.set_instruction_pointer(0);
 
             out_stream.write(b"\n").unwrap();
         }

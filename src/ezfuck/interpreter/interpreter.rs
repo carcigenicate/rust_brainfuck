@@ -48,10 +48,10 @@ impl ExecutionState {
 
 fn apply_math_operator(current_cell_value: u8, operator: MathOperator, value: u8) -> u8 {
     return match operator {
-        MathOperator::Addition => current_cell_value + value,
-        MathOperator::Subtraction => current_cell_value - value,
-        MathOperator::Multiplication => current_cell_value * value,
-        MathOperator::Division => current_cell_value / value,  // TODO: Ensure is floor division
+        MathOperator::Addition => current_cell_value.wrapping_add(value),
+        MathOperator::Subtraction => current_cell_value.wrapping_sub(value),
+        MathOperator::Multiplication => current_cell_value.wrapping_mul(value),
+        MathOperator::Division => current_cell_value.wrapping_div(value),
     }
 }
 
@@ -359,5 +359,29 @@ mod tests {
         assert_eq!(output_string, "A");
     }
 
-    // TODO: Cell value wrapping behavior
+    #[test]
+    fn it_should_wrap_cell_values_properly_on_increment() {
+        let increment = Instruction::ApplyOperatorToCell {
+            operator: MathOperator::Addition,
+            value: InstructionValue::Number(2)
+        };
+
+        let mut state = ExecutionState::new();
+        state.set_current_cell(255);
+        interpret_instruction_and_collect_output(increment, &mut state, b"");
+        assert_eq!(state.get_current_cell(), 1);
+    }
+
+    #[test]
+    fn it_should_wrap_cell_values_properly_on_decrement() {
+        let decrement = Instruction::ApplyOperatorToCell {
+            operator: MathOperator::Subtraction,
+            value: InstructionValue::Number(2)
+        };
+
+        let mut state = ExecutionState::new();
+        state.set_current_cell(0);
+        interpret_instruction_and_collect_output(decrement, &mut state, b"");
+        assert_eq!(state.get_current_cell(), 254);
+    }
 }

@@ -59,7 +59,7 @@ This will interpret the code as Ezfuck. The option to specify Brainfuck is not a
 Any comment-less Brainfuck should be valid Ezfuck. If you currently use `^`, `V`, `*`, or `/` in comments though, those
 will need to be removed first.
 
-# Ezfuck
+# Ezfuck "Specification"
 
 This is a re-implementation of a [project I did years ago](https://github.com/carcigenicate/ezfuck). The only differences
 between Brainfuck and Ezfuck are Ezfuck:
@@ -75,6 +75,56 @@ between Brainfuck and Ezfuck are Ezfuck:
 Unlike my previous implementation though, I omitted the `{}` operators that allow directly manipulating the instruction pointer.
 I'm not sure if those were even a useful feature to begin with.
 
+## Debugger
+
+The `!` instruction can be used to enter a debugging state. While in this state, the interpreter will execute instructions one
+at a time, and will also show the cell's current state, and the instructions being executed. While paused at the `EZ>` prompt,
+you can execute arbitrary Ezfuck (the cell and instructions pointers will not be retained after the REPL code has been executed)
+before the actual instruction is executed. Entering `!` while paused will cause the interpreter to leave the debugging state
+(although the state will be re-entered if a `!` instruction is encountered again).
+
+Currently, source maps are not used, so the debugger shows compiled instructions instead of the original source code.
+
+### Example
+
+This is example output taken from the sample "hello world" program paused mid-execution:
+
+```powershell
+                             V
+i | 000 | 001 | 002 | 003 | 004 | 005 |
+d | 008 | 000 | 009 | 013 | 011 | 004 |
+a |     |     |     |     |     |     |
+20   ApplyOperatorToCell { operator: Addition, value: Number(1) }
+21   AddToCellPtr { direction: Right, offset: Number(1) }
+22   ApplyOperatorToCell { operator: Subtraction, value: Number(1) }
+23 > AddToCellPtr { direction: Right, offset: Number(2) }
+24   ApplyOperatorToCell { operator: Addition, value: Number(1) }
+25   JumpToIf { position: 27, operator: Equal, match_value: 0 }
+26   AddToCellPtr { direction: Left, offset: Number(1) }
+EZ>
+
+
+
+                                         V
+i | 000 | 001 | 002 | 003 | 004 | 005 | 006 |
+d | 008 | 000 | 009 | 013 | 011 | 004 | 000 |
+a |     |     |     |     |     |     |     |
+21   AddToCellPtr { direction: Right, offset: Number(1) }
+22   ApplyOperatorToCell { operator: Subtraction, value: Number(1) }
+23   AddToCellPtr { direction: Right, offset: Number(2) }
+24 > ApplyOperatorToCell { operator: Addition, value: Number(1) }
+25   JumpToIf { position: 27, operator: Equal, match_value: 0 }
+26   AddToCellPtr { direction: Left, offset: Number(1) }
+27   JumpToIf { position: 25, operator: NotEqual, match_value: 0 }
+EZ>
+
+```
+
+Like with the REPL, the bar across the top of each entry shows the cell state, and where the cell pointer is located. Underneath
+that are the current instructions being executed. ">" marks the instruction about to be executed.
+
 # Future Plans
 
  - The ability to compile Brainfuck/Ezfuck to machine code
+ - The ability to refer to cells by Excel-style names like "A", "B", "C", . . ., "AA", "AB"
+ - Comments, since adding named cells will prevent Brainfuck's comment mechanism (ignoring irrelevant characters) from being unusable.

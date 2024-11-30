@@ -1,13 +1,15 @@
+use std::cmp::min;
 use std::io;
 use std::io::{BufRead, Read, Write};
-use strum_macros::Display;
-use crate::ezfuck::parser::parser::{Instruction, EqualityOperator, MathOperator, InstructionValue, Direction};
+use crate::ezfuck::parser::parser::{Instruction, EqualityOperator, MathOperator, InstructionValue, Direction, compile_to_intermediate};
+use crate::ezfuck::repl::cell_repr::{produce_cells_repr};
 
 #[derive(Clone, Debug)]
 pub struct ExecutionState {
     pub cells: Vec<u8>,
     pub cell_ptr: usize,
     pub instruction_ptr: usize,
+    pub is_debugging: bool,
 }
 
 impl ExecutionState {
@@ -16,6 +18,7 @@ impl ExecutionState {
             cell_ptr: 0,
             instruction_ptr: 0,
             cells: vec![0],
+            is_debugging: false,
         };
     }
 
@@ -73,7 +76,7 @@ fn read_value<R: BufRead>(in_stream: &mut R) -> u8 {
     return input[0];
 }
 
-pub fn interpret_instruction<R: BufRead, W: Write>(instruction: Instruction, state: &mut ExecutionState, in_stream: &mut R, out_stream: &mut W) -> () {
+pub fn interpret_instruction<R: BufRead, W: Write>(instruction: Instruction, state: &mut ExecutionState, in_stream: &mut R, out_stream: &mut W, allow_debugging: bool) -> () {
     match instruction {
         Instruction::ApplyOperatorToCell { operator, value } => {
             let actual_value = value.determine_value(state.get_current_cell());
@@ -116,20 +119,90 @@ pub fn interpret_instruction<R: BufRead, W: Write>(instruction: Instruction, sta
             let actual_value = value.determine_value(state.get_current_cell());
             state.set_current_cell(actual_value);
         }
+        Instruction::Breakpoint => {
+            if allow_debugging {
+                state.is_debugging = true;
+            }
+        }
     }
 }
 
-pub fn interpret<R: BufRead, W: Write>(instructions: &Vec<Instruction>, state: &mut ExecutionState, in_stream: &mut R, out_stream: &mut W) -> () {
+pub fn interpret<R: BufRead, W: Write>(instructions: &Vec<Instruction>, state: &mut ExecutionState, in_stream: &mut R, out_stream: &mut W, allow_debugging: bool) -> () {
     while state.instruction_ptr < instructions.len() {
-        let current_instruction = instructions[state.instruction_ptr];
-
-        interpret_instruction(current_instruction, state, in_stream, out_stream);
+        if state.is_debugging {
+            start_debugger(&instructions, state, in_stream, out_stream);
+        } else {
+            let current_instruction = instructions[state.instruction_ptr];
+            interpret_instruction(current_instruction, state, in_stream, out_stream, allow_debugging);
+        }
 
         state.instruction_ptr += 1;
     }
 }
 
-pub fn interpret_with_std_io(instructions: &Vec<Instruction>) {
+fn produce_instructions_repr(instructions: &Vec<Instruction>, instruction_ptr: usize, show_n_around: usize) -> String {
+    let start_bound = instruction_ptr.checked_sub(show_n_around).unwrap_or(0);
+    let end_bound = min(instruction_ptr + show_n_around, instructions.len() - 1);
+    let relevant_instructions = &instructions[start_bound..=end_bound];
+
+    let instruction_ptr_places = (instructions.len().ilog10() + 1) as usize;
+
+    let mut repr = String::new();
+    for (i, instruction) in relevant_instructions.into_iter().enumerate() {
+        let current_instruction_ptr = start_bound + i;
+        let marker = if instruction_ptr == current_instruction_ptr { "> " } else { "  " };
+        repr.push_str(format!("{current_instruction_ptr:0instruction_ptr_places$} {marker}{:?}\n", instruction).as_str());
+    }
+
+    return repr;
+}
+
+fn start_debugger<R: BufRead, W: Write>(instructions: &Vec<Instruction>, state: &mut ExecutionState, in_stream: &mut R, out_stream: &mut W) -> () {
+    writeln!(out_stream, "").unwrap();
+    let cells_repr = produce_cells_repr(&state.cells, state.cell_ptr);
+    out_stream.write(cells_repr.as_bytes()).unwrap();
+    out_stream.flush().unwrap();
+
+    let instructions_repr = produce_instructions_repr(instructions, state.instruction_ptr, 3);
+    out_stream.write(instructions_repr.as_bytes()).unwrap();
+
+    out_stream.write(b"EZ> ").unwrap();
+    out_stream.flush().unwrap();
+
+    let mut input_buffer: String = String::new();
+    in_stream.read_line(&mut input_buffer).unwrap();
+
+    if input_buffer.starts_with("!") {
+        state.is_debugging = false;
+    } else if input_buffer.is_empty() == false {
+        let dbg_instructions = compile_to_intermediate(&input_buffer, false);
+
+        let current_instruction_ptr = state.instruction_ptr;
+        state.instruction_ptr = 0;
+
+        let current_cell_ptr = state.cell_ptr;
+
+        interpret(&dbg_instructions, state, in_stream, out_stream, false);
+
+        state.cell_ptr = current_cell_ptr;
+        state.instruction_ptr = current_instruction_ptr;
+
+        out_stream.write(b"\n").unwrap();
+    }
+
+    match instructions.get(state.instruction_ptr) {
+        Some(instruction) => {
+            interpret_instruction(*instruction, state, in_stream, out_stream, false);
+        }
+        None => {
+            // TODO: Is this even possible? When entering debugging mode on the last instruction?
+        }
+    }
+
+    writeln!(out_stream, "").unwrap();
+}
+
+pub fn interpret_with_std_io(instructions: &Vec<Instruction>, allow_debugging: bool) -> () {
     let stdin = io::stdin();
     let mut input = stdin.lock();
 
@@ -137,7 +210,7 @@ pub fn interpret_with_std_io(instructions: &Vec<Instruction>) {
 
     let mut state = ExecutionState::new();
 
-    interpret(instructions, &mut state, &mut input, &mut stdout);
+    interpret(instructions, &mut state, &mut input, &mut stdout, allow_debugging);
 }
 
 #[cfg(test)]
@@ -149,7 +222,7 @@ mod tests {
         let mut input = &input[..];
         let mut output = vec![];
 
-        interpret(&instructions, state, &mut input, &mut output);
+        interpret(&instructions, state, &mut input, &mut output, false);
 
         let output_string = String::from_utf8(output).unwrap();
         return output_string;
@@ -160,7 +233,7 @@ mod tests {
         let mut output = vec![];
 
 
-        interpret_instruction(instruction, state, &mut input, &mut output);
+        interpret_instruction(instruction, state, &mut input, &mut output, false);
 
         let output_string = String::from_utf8(output).unwrap();
         return output_string;
@@ -313,7 +386,7 @@ mod tests {
     fn it_should_print_hello_world() {
         // TODO: Find a more isolated, clean way of doing this test without relying on the parser
         let code = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.";
-        let instructions = compile_to_intermediate(code);
+        let instructions = compile_to_intermediate(code, false);
 
         let mut state = ExecutionState::new();
         let output_string = interpret_and_collect_output(&instructions, &mut state, b"");
@@ -323,7 +396,7 @@ mod tests {
     #[test]
     fn it_should_print_hello_world_using_values() {
         let code = "+8[>+4[>+2>+3>+3>+<4-]>+>+>->2+[<]<-]>2.>-3.+7..+3.>2.<-.<.+3.-6.-8.>2+.>+2.";
-        let instructions = compile_to_intermediate(code);
+        let instructions = compile_to_intermediate(code, false);
 
         let mut state = ExecutionState::new();
         let output_string = interpret_and_collect_output(&instructions, &mut state, b"");
@@ -333,7 +406,7 @@ mod tests {
     #[test]
     fn it_should_set_cell_value_using_extraction() {
         let code = "^65 .";
-        let instructions = compile_to_intermediate(code);
+        let instructions = compile_to_intermediate(code, false);
 
         let mut state = ExecutionState::new();
         let output_string = interpret_and_collect_output(&instructions, &mut state, b"");
@@ -352,7 +425,7 @@ mod tests {
     #[test]
     fn it_should_properly_parse_concurrent_insertions() {
         let code = "^^65 .";
-        let instructions = compile_to_intermediate(code);
+        let instructions = compile_to_intermediate(code, false);
 
         let mut state = ExecutionState::new();
         let output_string = interpret_and_collect_output(&instructions, &mut state, b"");

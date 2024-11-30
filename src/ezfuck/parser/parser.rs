@@ -46,6 +46,7 @@ pub enum Instruction {
     PrintOut,
     ReadIn,
     SetCell { value: InstructionValue },
+    Breakpoint,
 }
 
 impl Display for Instruction {
@@ -57,6 +58,7 @@ impl Display for Instruction {
             Instruction::PrintOut => "Print".to_string(),
             Instruction::ReadIn => "Read".to_string(),
             Instruction::SetCell { value} => format!("Set Cell to {value}"),
+            Instruction::Breakpoint => "Breakpoint".to_string(),
         };
 
         return write!(f, "{}", output);
@@ -79,8 +81,8 @@ impl Token {
     }
 }
 
-const INSTRUCTION_SYMBOLS: &str = "+-*/<>[]^.,";
-const VALUELESS_INSTRUCTION_SYMBOLS: &str = "[],.";
+const INSTRUCTION_SYMBOLS: &str = "+-*/<>[]^.,!";
+const VALUELESS_INSTRUCTION_SYMBOLS: &str = "[],.!";
 const VALUE_SYMBOLS: &str = "1234567890V";
 
 fn find_loop_indices(tokens: &Vec<Token>) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
@@ -184,7 +186,7 @@ fn assert_valueless(token: Token) {
     }
 }
 
-fn parse(tokens: Vec<Token>) -> Vec<Instruction> {
+fn parse(tokens: Vec<Token>, allow_debugging: bool) -> Vec<Instruction> {
     let mut instructions = Vec::new();
 
     let (start_to_end, end_to_start) = find_loop_indices(&tokens);
@@ -212,6 +214,7 @@ fn parse(tokens: Vec<Token>) -> Vec<Instruction> {
             '.' => Some(Instruction::PrintOut),
             ',' => Some(Instruction::ReadIn),
             '^' => Some(Instruction::SetCell { value: defaulted_value }),
+            '!' => if allow_debugging { Some(Instruction::Breakpoint) } else { None },
             _ => None,
         };
 
@@ -224,10 +227,10 @@ fn parse(tokens: Vec<Token>) -> Vec<Instruction> {
     return instructions;
 }
 
-pub fn compile_to_intermediate(code: &str) -> Vec<Instruction> {
+pub fn compile_to_intermediate(code: &str, allow_debugging: bool) -> Vec<Instruction> {
     let code_vec: Vec<char> = code.chars().collect();
     let tokens = lex(&code_vec);
-    let instructions = parse(tokens);
+    let instructions = parse(tokens, allow_debugging);
     return instructions;
 }
 
@@ -238,7 +241,7 @@ mod tests {
     #[test]
     fn it_should_ignore_invalid_characters() {
         let code = "+None of this should be considered*";
-        let instructions = compile_to_intermediate(code);
+        let instructions = compile_to_intermediate(code, false);
 
         assert_eq!(instructions.len(), 2);
 
@@ -249,7 +252,7 @@ mod tests {
     #[test]
     fn it_should_produce_the_correct_instruction_for_each_token() {
         let code = "[]+-*/<>.,^";
-        let instructions = compile_to_intermediate(code);
+        let instructions = compile_to_intermediate(code, false);
 
         assert_eq!(instructions.len(), 11);
 
@@ -269,7 +272,7 @@ mod tests {
     #[test]
     fn it_should_properly_read_instruction_values_and_default_missing_ones_to_one() {
         let code = "++1+2+3+40+200";
-        let instructions = compile_to_intermediate(code);
+        let instructions = compile_to_intermediate(code, false);
 
         assert_eq!(instructions.len(), 6);
 
@@ -284,7 +287,7 @@ mod tests {
     #[test]
     fn it_should_properly_add_insertion_values() {
         let code = "+V";
-        let instructions = compile_to_intermediate(code);
+        let instructions = compile_to_intermediate(code, false);
 
         assert_eq!(instructions.len(), 1);
         assert_eq!(instructions[0], Instruction::ApplyOperatorToCell { operator: MathOperator::Addition, value: InstructionValue::CurrentCell });
@@ -294,13 +297,13 @@ mod tests {
     #[should_panic]
     fn it_should_panic_on_mismatched_start_brace() {
         let code = "+[-";
-        compile_to_intermediate(code);
+        compile_to_intermediate(code, false);
     }
 
     #[test]
     #[should_panic]
     fn it_should_panic_on_mismatched_end_brace() {
         let code = "+]-";
-        compile_to_intermediate(code);
+        compile_to_intermediate(code, false);
     }
 }

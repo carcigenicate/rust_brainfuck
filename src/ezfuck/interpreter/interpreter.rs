@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::io;
 use std::io::{BufRead, Read, Write};
-use crate::ezfuck::parser::parser::{Instruction, EqualityOperator, MathOperator, InstructionValue, Direction, compile_to_intermediate};
+use crate::ezfuck::parser::parser::{Instruction, EqualityOperator, MathOperator, Value, Direction, compile_to_intermediate};
 use crate::ezfuck::repl::cell_repr::{produce_cells_repr};
 
 #[derive(Clone, Debug)]
@@ -243,7 +243,7 @@ mod tests {
     fn it_should_add_to_the_current_cell() {
         let instruction = Instruction::ApplyOperatorToCell {
             operator: MathOperator::Addition,
-            value: InstructionValue::Number(5),
+            value: Value::Number(5),
         };
 
         let mut state = ExecutionState::new();
@@ -255,7 +255,7 @@ mod tests {
     fn it_should_subtract_from_the_current_cell() {
         let instruction = Instruction::ApplyOperatorToCell {
             operator: MathOperator::Subtraction,
-            value: InstructionValue::Number(5),
+            value: Value::Number(5),
         };
 
         let mut state = ExecutionState::new();
@@ -268,7 +268,7 @@ mod tests {
     fn it_should_multiply_the_current_cell() {
         let instruction = Instruction::ApplyOperatorToCell {
             operator: MathOperator::Multiplication,
-            value: InstructionValue::Number(5),
+            value: Value::Number(5),
         };
 
         let mut state = ExecutionState::new();
@@ -281,7 +281,7 @@ mod tests {
     fn it_should_divide_the_current_cell() {
         let instruction = Instruction::ApplyOperatorToCell {
             operator: MathOperator::Division,
-            value: InstructionValue::Number(5),
+            value: Value::Number(5),
         };
 
         let mut state = ExecutionState::new();
@@ -336,7 +336,7 @@ mod tests {
     fn it_should_move_the_instruction_pointer_to_the_left() {
         let instruction = Instruction::AddToCellPtr {
             direction: Direction::Left,
-            offset: InstructionValue::Number(5),
+            offset: Value::Number(5),
         };
 
         let mut state = ExecutionState::new();
@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn it_should_set_the_current_cell() {
         let instruction = Instruction::SetCell {
-            value: InstructionValue::Number(5),
+            value: Value::Number(5),
         };
 
         let mut state = ExecutionState::new();
@@ -360,7 +360,7 @@ mod tests {
     fn it_should_move_the_instruction_pointer_to_the_right() {
         let instruction = Instruction::AddToCellPtr {
             direction: Direction::Right,
-            offset: InstructionValue::Number(5),
+            offset: Value::Number(5),
         };
 
         let mut state = ExecutionState::new();
@@ -436,7 +436,7 @@ mod tests {
     fn it_should_wrap_cell_values_properly_on_increment() {
         let increment = Instruction::ApplyOperatorToCell {
             operator: MathOperator::Addition,
-            value: InstructionValue::Number(2)
+            value: Value::Number(2)
         };
 
         let mut state = ExecutionState::new();
@@ -449,7 +449,7 @@ mod tests {
     fn it_should_wrap_cell_values_properly_on_decrement() {
         let decrement = Instruction::ApplyOperatorToCell {
             operator: MathOperator::Subtraction,
-            value: InstructionValue::Number(2)
+            value: Value::Number(2)
         };
 
         let mut state = ExecutionState::new();

@@ -69,11 +69,21 @@ between Brainfuck and Ezfuck are Ezfuck:
    `*5` multiplies the current cell by 5, and `>5` moves 5 cells to the right. If an argument is omitted, it defaults to 1.
  - Adds the `^` operator that sets the current cell value, regardless of what it was before. `^` sets the current cell to 1,
    and `^25` sets the current cell to 25.
+ - Adds the `@` operator that sets the cell pointer to the given value. `@5` sets the cell pointer to cell 5 (the sixth cell).
+     - Note: Because command arguments can only be integers between 0 and 255, `@` can only be used to set in that range,
+       even though the cell is.
  - Adds a special `V` value that allows using the current cell as an argument. If the current cell has a value of 5, `+V` will
    have the same effect as `+5` or `+++++`.
 
 Unlike my previous implementation though, I omitted the `{}` operators that allow directly manipulating the instruction pointer.
 I'm not sure if those were even a useful feature to begin with.
+
+## Default Arguments
+All commands that are not explicitly given an argument are implicitly given an argument of `1` (`+` is identical to `+1`).
+This has a couple of noteworthy consequences:
+
+ - `*` and `/` without arguments are effectively no-ops.
+ - `@` without arguments defaults to cell 1, which is the second cell.
 
 ## Debugger
 

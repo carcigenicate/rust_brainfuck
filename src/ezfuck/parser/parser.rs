@@ -5,7 +5,7 @@ use std::string::ToString;
 use strum_macros::Display;
 
 // const COMMAND_SYMBOLS: [&str; 12] = ["+", "-", "*", "/", "<", ">", "[", "]", "^", ",", ".", "!"];
-const COMMAND_SYMBOLS: &str = "+-*/<>[]^.,!";
+const COMMAND_SYMBOLS: &str = "+-*/<>[]^.,!@";
 const VALUELESS_COMMAND_SYMBOLS: &str = "[],.!";
 const NUMERIC_LITERAL_SYMBOLS: &str  = "1234567890";
 const CURRENT_CELL_SYMBOLS: &str  = "V";
@@ -205,6 +205,13 @@ pub enum MathOperator {
 }
 
 #[derive(Copy, Clone, Debug, Display, Eq, PartialEq)]
+pub enum CellMoveOperator {
+    Left,
+    Right,
+    Set,
+}
+
+#[derive(Copy, Clone, Debug, Display, Eq, PartialEq)]
 pub enum Direction {
     Left,
     Right,
@@ -213,7 +220,7 @@ pub enum Direction {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Instruction {
     ApplyOperatorToCell { operator: MathOperator, value: Value },
-    AddToCellPtr { direction: Direction, offset: Value },
+    ApplyOperatorToCellPtr { operator: CellMoveOperator, value: Value },
     JumpToIf { position: usize, operator: EqualityOperator, match_value: u8 },
     PrintOut,
     ReadIn,
@@ -221,21 +228,21 @@ pub enum Instruction {
     Breakpoint,
 }
 
-impl Display for Instruction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let output = match self {
-            Instruction::ApplyOperatorToCell { operator, value } => format!("Cell <{operator}> {value}"),
-            Instruction::AddToCellPtr { direction, offset } => format!("Move slots by {offset} {direction}"),
-            Instruction::JumpToIf { position, operator, match_value } => format!("Jump to {position} when value {operator} {match_value}"),
-            Instruction::PrintOut => "Print".to_string(),
-            Instruction::ReadIn => "Read".to_string(),
-            Instruction::SetCell { value} => format!("Set Cell to {value}"),
-            Instruction::Breakpoint => "Breakpoint".to_string(),
-        };
-
-        return write!(f, "{}", output);
-    }
-}
+// impl Display for Instruction {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         let output = match self {
+//             Instruction::ApplyOperatorToCell { operator, value } => format!("Cell <{operator}> {value}"),
+//             Instruction::ApplyOperatorToCellPtr { operator, value } => format!("Move slots by {offset} {direction}"),
+//             Instruction::JumpToIf { position, operator, match_value } => format!("Jump to {position} when value {operator} {match_value}"),
+//             Instruction::PrintOut => "Print".to_string(),
+//             Instruction::ReadIn => "Read".to_string(),
+//             Instruction::SetCell { value} => format!("Set Cell to {value}"),
+//             Instruction::Breakpoint => "Breakpoint".to_string(),
+//         };
+//
+//         return write!(f, "{}", output);
+//     }
+// }
 
 fn find_loop_indices(commands: &Vec<Command>) -> (HashMap<usize, usize>, HashMap<usize, usize>) {
     let mut start_to_end: HashMap<usize, usize> = HashMap::new();
@@ -286,8 +293,9 @@ fn compile_commands_to_intermediate(commands: Vec<Command>, allow_debugging: boo
             '-' => Some(Instruction::ApplyOperatorToCell { operator: MathOperator::Subtraction, value: defaulted_value }),
             '*' => Some(Instruction::ApplyOperatorToCell { operator: MathOperator::Multiplication, value: defaulted_value }),
             '/' => Some(Instruction::ApplyOperatorToCell { operator: MathOperator::Division, value: defaulted_value }),
-            '<' => Some(Instruction::AddToCellPtr { direction: Direction::Left, offset: defaulted_value }),
-            '>' => Some(Instruction::AddToCellPtr { direction: Direction::Right, offset: defaulted_value }),
+            '<' => Some(Instruction::ApplyOperatorToCellPtr { operator: CellMoveOperator::Left, value: defaulted_value }),
+            '>' => Some(Instruction::ApplyOperatorToCellPtr { operator: CellMoveOperator::Right, value: defaulted_value }),
+            '@' => Some(Instruction::ApplyOperatorToCellPtr { operator: CellMoveOperator::Set, value: defaulted_value }),
             '[' => {
                 let end_i = start_to_end.get(&i).unwrap();
                 Some(Instruction::JumpToIf { position: *end_i, operator: EqualityOperator::Equal, match_value: 0 })
@@ -405,10 +413,10 @@ mod tests {
 
         #[test]
         fn it_should_produce_the_correct_instruction_for_each_token() {
-            let code = "[]+-*/<>.,^";
+            let code = "[]+-*/<>@.,^";
             let instructions = compile_to_intermediate(code, false);
 
-            assert_eq!(instructions.len(), 11);
+            assert_eq!(instructions.len(), 12);
 
             assert_eq!(instructions[0], Instruction::JumpToIf { position: 1, operator: EqualityOperator::Equal, match_value: 0 });
             assert_eq!(instructions[1], Instruction::JumpToIf { position: 0, operator: EqualityOperator::NotEqual, match_value: 0 });
@@ -417,10 +425,11 @@ mod tests {
             assert_eq!(instructions[3], Instruction::ApplyOperatorToCell { operator: MathOperator::Subtraction, value: Value::Number(1) });
             assert_eq!(instructions[4], Instruction::ApplyOperatorToCell { operator: MathOperator::Multiplication, value: Value::Number(1) });
             assert_eq!(instructions[5], Instruction::ApplyOperatorToCell { operator: MathOperator::Division, value: Value::Number(1) });
-            assert_eq!(instructions[6], Instruction::AddToCellPtr { direction: Direction::Left, offset: Value::Number(1) });
-            assert_eq!(instructions[7], Instruction::AddToCellPtr { direction: Direction::Right, offset: Value::Number(1) });
-            assert_eq!(instructions[8], Instruction::PrintOut);
-            assert_eq!(instructions[9], Instruction::ReadIn);
+            assert_eq!(instructions[6], Instruction::ApplyOperatorToCellPtr { operator: CellMoveOperator::Left, value: Value::Number(1) });
+            assert_eq!(instructions[7], Instruction::ApplyOperatorToCellPtr { operator: CellMoveOperator::Right, value: Value::Number(1) });
+            assert_eq!(instructions[8], Instruction::ApplyOperatorToCellPtr { operator: CellMoveOperator::Set, value: Value::Number(1) });
+            assert_eq!(instructions[9], Instruction::PrintOut);
+            assert_eq!(instructions[10], Instruction::ReadIn);
         }
 
         #[test]

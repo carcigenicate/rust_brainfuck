@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::io;
 use std::io::{BufRead, Read, Write};
-use crate::ezfuck::parser::parser::{Instruction, EqualityOperator, MathOperator, Value, Direction, compile_to_intermediate};
+use crate::ezfuck::parser::parser::{Instruction, EqualityOperator, MathOperator, Value, Direction, compile_to_intermediate, CellMoveOperator};
 use crate::ezfuck::repl::cell_repr::{produce_cells_repr};
 
 #[derive(Clone, Debug)]
@@ -58,6 +58,14 @@ fn apply_math_operator(current_cell_value: u8, operator: MathOperator, value: u8
     }
 }
 
+fn apply_cell_ptr_operator(current_cell_ptr: usize, operator: CellMoveOperator, value: usize) -> usize {
+    return match operator {
+        CellMoveOperator::Left => current_cell_ptr.checked_sub(value).expect("Cell Pointer Underflowed"),
+        CellMoveOperator::Right => current_cell_ptr.checked_add(value).expect("Cell Pointer Overflowed"),
+        CellMoveOperator::Set => value,
+    }
+}
+
 fn add_cell_ptr_value(current_cell_ptr: usize, ptr_offset: isize) -> usize {
     return match current_cell_ptr.checked_add_signed(ptr_offset) {
         Some(added) => added,
@@ -84,10 +92,9 @@ pub fn interpret_instruction<R: BufRead, W: Write>(instruction: Instruction, sta
             state.set_current_cell(new_cell_value);
         }
 
-        Instruction::AddToCellPtr { direction, offset } => {
-            let abs_offset = offset.determine_value(state.get_current_cell());
-            let signed_offset = if direction == Direction::Left { abs_offset as isize * -1 } else { abs_offset as isize };
-            let new_cell_ptr = add_cell_ptr_value(state.cell_ptr, signed_offset);
+        Instruction::ApplyOperatorToCellPtr { operator, value } => {
+            let actual_value = value.determine_value(state.get_current_cell());
+            let new_cell_ptr = apply_cell_ptr_operator(state.cell_ptr, operator, actual_value as usize);
             state.set_cell_pointer(new_cell_ptr);
         }
 
@@ -333,16 +340,40 @@ mod tests {
     }
 
     #[test]
-    fn it_should_move_the_instruction_pointer_to_the_left() {
-        let instruction = Instruction::AddToCellPtr {
-            direction: Direction::Left,
-            offset: Value::Number(5),
+    fn it_should_move_the_cell_pointer_to_the_left() {
+        let instruction = Instruction::ApplyOperatorToCellPtr {
+            operator: CellMoveOperator::Left,
+            value: Value::Number(5),
         };
 
         let mut state = ExecutionState::new();
         state.set_cell_pointer(20);
         interpret_instruction_and_collect_output(instruction, &mut state, b"");
         assert_eq!(state.cell_ptr, 15);
+    }
+
+    #[test]
+    fn it_should_move_the_cell_pointer_to_the_right() {
+        let instruction = Instruction::ApplyOperatorToCellPtr {
+            operator: CellMoveOperator::Right,
+            value: Value::Number(5),
+        };
+
+        let mut state = ExecutionState::new();
+        interpret_instruction_and_collect_output(instruction, &mut state, b"");
+        assert_eq!(state.cell_ptr, 5);
+    }
+
+    #[test]
+    fn it_should_set_the_cell_pointer_directly() {
+        let instruction = Instruction::ApplyOperatorToCellPtr {
+            operator: CellMoveOperator::Set,
+            value: Value::Number(10),
+        };
+
+        let mut state = ExecutionState::new();
+        interpret_instruction_and_collect_output(instruction, &mut state, b"");
+        assert_eq!(state.cell_ptr, 10);
     }
 
     #[test]
@@ -354,18 +385,6 @@ mod tests {
         let mut state = ExecutionState::new();
         interpret_instruction_and_collect_output(instruction, &mut state, b"");
         assert_eq!(state.cells, vec![5]);
-    }
-
-    #[test]
-    fn it_should_move_the_instruction_pointer_to_the_right() {
-        let instruction = Instruction::AddToCellPtr {
-            direction: Direction::Right,
-            offset: Value::Number(5),
-        };
-
-        let mut state = ExecutionState::new();
-        interpret_instruction_and_collect_output(instruction, &mut state, b"");
-        assert_eq!(state.cell_ptr, 5);
     }
 
     #[test]
@@ -386,6 +405,16 @@ mod tests {
     fn it_should_print_hello_world() {
         // TODO: Find a more isolated, clean way of doing this test without relying on the parser
         let code = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.";
+        let instructions = compile_to_intermediate(code, false);
+
+        let mut state = ExecutionState::new();
+        let output_string = interpret_and_collect_output(&instructions, &mut state, b"");
+        assert_eq!(output_string, "Hello World!\n");
+    }
+
+    #[test]
+    fn it_should_print_hello_world_using_values() {
+        let code = "+8[>+4[>+2>+3>+3>+<4-]>+>+>->2+[<]<-]>2.>-3.+7..+3.>2.<-.<.+3.-6.-8.>2+.>+2.";
         let instructions = compile_to_intermediate(code, false);
 
         let mut state = ExecutionState::new();
